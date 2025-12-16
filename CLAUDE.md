@@ -120,3 +120,92 @@ Server types: `uvx` (Python), `npx` (Node.js), `sh` (Docker via shell), `node` (
 | `MCP_CONFIG_PATH` | `/app/mcp-config.json` | Server config path |
 | `GATEWAY_MODE` | `lite` | `lite` (stateless) or `full` (with DB) |
 | `DATABASE_URL` | - | PostgreSQL connection (full mode only) |
+
+## Session Persistence (IMPORTANT)
+
+This repo has **session persistence** enabled via MCP memory tools. You should actively use these to maintain context across sessions and compaction events.
+
+### On Session Start
+
+When you start working in this repo, check for previous session context:
+
+```
+1. Call memory_search with query "session context airis-mcp-gateway" (limit 1)
+2. If found, briefly summarize what was being worked on
+3. Ask if the user wants to continue that work or start fresh
+```
+
+### Before Context Compaction
+
+When context is getting low (you'll sense this) or when the user triggers `/compact`:
+
+```
+1. Identify the current task/work in progress
+2. Note any key decisions made and their rationale
+3. List incomplete items or next steps
+4. Call memory_write to save a session checkpoint:
+   - name: "session-airis-mcp-gateway-{timestamp}"
+   - category: "note"
+   - tags: ["session", "checkpoint"]
+5. If significant decisions were made, call create_entities to update the knowledge graph
+```
+
+### Session Checkpoint Format
+
+```markdown
+## Session: airis-mcp-gateway
+
+### Working On
+{Brief description of current task}
+
+### Key Decisions
+- {Decision 1}: {rationale}
+- {Decision 2}: {rationale}
+
+### Progress
+- [x] {Completed item}
+- [ ] {Incomplete item}
+
+### Next Steps
+- {Next action 1}
+- {Next action 2}
+
+### Context to Preserve
+{Any important context that would be lost in compaction}
+```
+
+### When to Create Learning Journal Entries
+
+After solving non-trivial problems, create a learning entry:
+
+```
+memory_write(
+  name: "learning-airis-mcp-gateway-{topic}",
+  category: "decision",
+  tags: ["learning", "insight"]
+)
+```
+
+### Memory Tools Quick Reference
+
+| Tool | Use For |
+|------|---------|
+| `memory_search` | Find previous sessions, decisions, learnings |
+| `memory_write` | Save session checkpoints, learnings |
+| `memory_read` | Read a specific memory by name |
+| `memory_list` | List all memories for this project |
+| `create_entities` | Add to knowledge graph (projects, decisions, relations) |
+| `read_graph` | View full knowledge graph |
+
+### Proactive Behavior
+
+**DO:**
+- Check for previous context on session start
+- Save context before compaction (proactively, don't wait to be asked)
+- Create learning entries after solving hard problems
+- Update knowledge graph with architecture decisions
+
+**DON'T:**
+- Wait for user to ask you to save context
+- Let important decisions disappear in compaction
+- Forget to check for previous session state
