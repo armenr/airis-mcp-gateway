@@ -1,6 +1,44 @@
 name: airis-mcp-gateway
 
 services:
+  # Ollama for embeddings (used by mindbase for semantic search)
+  # Model is pulled on first startup via init container
+  ollama:
+    container_name: airis-ollama
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-data:/root/.ollama
+    expose:
+      - "11434"
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  # Pull embedding model on first startup
+  ollama-init:
+    container_name: airis-ollama-init
+    image: curlimages/curl:latest
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for Ollama to be ready..."
+        until curl -sf http://ollama:11434/api/tags >/dev/null 2>&1; do
+          echo "Waiting..."
+          sleep 2
+        done
+        echo "Pulling nomic-embed-text model..."
+        curl -X POST http://ollama:11434/api/pull -d '{"name": "nomic-embed-text"}'
+        echo ""
+        echo "Model ready!"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
   # PostgreSQL for mindbase (with pgvector extension)
   # Required by mindbase MCP server for memory/graph storage
   mindbase-postgres-dev:
@@ -67,6 +105,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HOST_WORKSPACE_DIR:-${HOME}/github}:/workspace:rw
       - ./catalogs:/catalogs:ro
+    depends_on:
+      ollama:
+        condition: service_healthy
+      mindbase-postgres-dev:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qS --spider http://localhost:9390/health 2>&1 | grep -q '200'"]
       interval: 10s
@@ -110,7 +153,9 @@ services:
     restart: unless-stopped
 
 volumes:
-  mindbase-data:    # PostgreSQL data for pgvector
-  cache-uv:         # uvx package cache (persists airis-agent packages)
-  cache-npm:        # npm package cache (persists npx server packages)
-  memory-data:      # Knowledge graph JSON file
+  ollama-data:        # Ollama models cache (nomic-embed-text ~274MB)
+  mindbase-data:      # PostgreSQL data for pgvector
+  mindbase-memories:  # Mindbase markdown files (persists across container restarts)
+  cache-uv:           # uvx package cache (persists airis-agent packages)
+  cache-npm:          # npm package cache (persists npx server packages)
+  memory-data:        # Knowledge graph JSON file

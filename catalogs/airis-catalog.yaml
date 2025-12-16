@@ -63,11 +63,13 @@ registry:
             description: Embedding model name
     env:
       - name: DATABASE_URL
-        value: '{{mindbase_settings.database_url|default:"postgresql://mindbase:mindbase@mindbase-postgres-dev:5432/mindbase"}}'
+        value: 'postgresql://mindbase:mindbase@mindbase-postgres-dev:5432/mindbase'
       - name: OLLAMA_URL
-        value: '{{mindbase_settings.ollama_url|default:"http://host.docker.internal:11434"}}'
+        value: 'http://ollama:11434'
       - name: EMBEDDING_MODEL
-        value: '{{mindbase_settings.embedding_model|default:"nomic-embed-text"}}'
+        value: 'nomic-embed-text'
+    volumes:
+      - 'mindbase-memories:/root/Library/Application Support/mindbase'
     allowHosts:
       - "*"
 
